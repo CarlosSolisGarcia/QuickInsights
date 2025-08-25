@@ -30,7 +30,7 @@ if uploaded_file is not None:
         f"""
             #### Dataset shape:
             - **Number of observations (rows)**: {dataframe_num_rows}
-            - **Number of variables (columns)**: {dataframe_num_cols}
+            - **Number of variables (columns)**: {dataframe_num_cols}            
             #### Missing values:
             - Number of missing values: {dataframe_num_missing_values}
             - % of missing values: {dataframe_percentage_missing_values:.2f} %
@@ -61,32 +61,95 @@ if uploaded_file is not None:
 
         series_to_analyze = dataframe[selected_variable]
 
-        data_info_tab, histogram_tab = st.tabs(["Data info", "Histogram"])
+        st.subheader(selected_variable)
 
-        with data_info_tab:
-            col1, col2 = st.columns(2)
+        if series_to_analyze.dtype == "object":
+            ### Check if the object might be an ID or similar
+            # if series_to_analyze.nunique() / len(series_to_analyze) > 0.9:
+            #     st.write("Probably and ID")
+            #
+            # else:
+            #     st.write("TBD")
 
-            with col1:
-                st.subheader("General info")
-                st.write(f"Data type: {series_to_analyze.dtype}")
-                st.write(f"Missing values: {pd.isna(series_to_analyze).sum()}")
-                st.write(f"Missing values %: {pd.isna(series_to_analyze).sum() / dataframe.shape[0] * 100:.2f}")
-                st.write(f"Memory usage (kB):  {series_to_analyze.memory_usage() / 1024:.2f} kb")
+            data_info_tab, object_graphs_tab = st.tabs(["Data info", "Graphs"])
 
-            with col2:
-                st.subheader("Statistical info")
-                st.write(f"Mean: {series_to_analyze.mean():.2f}")
-                st.write(f"Median: {series_to_analyze.median()}")
-                st.write(f"Standard deviation: {series_to_analyze.std():.2f}")
-                st.write(f"Max: {series_to_analyze.max()}")
-                st.write(f"Min: {series_to_analyze.min()}")
+            with data_info_tab:
+                col1, col2, col3 = st.columns(3)
 
-        with histogram_tab:
+                with col3:
+                    top_n = st.slider(label="Top N", min_value=1, value=5)
+                    rare_freq = st.slider(label="Rare freq", min_value=1, value=10)
 
-            fig, ax = plt.subplots()
-            ax.hist(series_to_analyze, bins = 20)
-            ax.set_title(str(selected_variable))
-            st.pyplot(fig)
+
+                with col1:
+                    st.subheader("General info")
+                    st.write(f"Data type: {series_to_analyze.dtype}")
+                    st.write(f"Number of unique values: {series_to_analyze.nunique(dropna=True)}")
+                    st.write(f"Missing values: {pd.isna(series_to_analyze).sum()}")
+                    st.write(f"Missing values %: {pd.isna(series_to_analyze).sum() / dataframe.shape[0] * 100:.2f}")
+                    st.write(f"Memory usage (kB):  {series_to_analyze.memory_usage() / 1024:.2f} kb")
+
+                with col2:
+                    #Precalc_vars:
+                    string_lengths = series_to_analyze.dropna().astype(str).str.len()
+                    top_values = series_to_analyze.value_counts(dropna=False).head(top_n)
+                    top_prop = top_values.iloc[0] / len(series_to_analyze)
+                    top_category_name = top_values.index[0]
+
+                    value_counts = series_to_analyze.value_counts()
+                    rare_mask = value_counts < rare_freq
+                    rare_values = rare_mask.sum()
+                    rare_categories = value_counts[rare_mask].index.tolist()
+
+                    ### Display info:
+                    st.subheader("Statistical info")
+                    st.write(f"Min. length: {string_lengths.min()}")
+                    st.write(f"Max. length: {string_lengths.max()}")
+                    st.write(f"Average length: {string_lengths.mean():.2f}")
+                    st.write(f"Top category: {top_category_name}")
+                    st.write(f"Top category occurrences: {top_values.iloc[0]}")
+                    st.write(f"Top category proportion: {top_prop:.2f}")
+                    st.write(f"Rare categories (<{rare_freq} appearances): {rare_categories}")
+
+            with object_graphs_tab:
+                fig, ax = plt.subplots()
+                sns.barplot(x=top_values.values, y=top_values.index, palette="viridis", ax=ax)
+                ax.set_xlabel("Count")
+                ax.set_ylabel("Category")
+                ax.set_title(f"Top {top_n} categories for '{series_to_analyze.name}'")
+                st.pyplot(fig)
+
+        elif series_to_analyze.dtype == "datetime":
+            pass
+
+        else:
+
+            data_info_tab, histogram_tab = st.tabs(["Data info", "Histogram"])
+
+            with data_info_tab:
+                col1, col2 = st.columns(2)
+
+                with col1:
+                    st.subheader("General info")
+                    st.write(f"Data type: {series_to_analyze.dtype}")
+                    st.write(f"Missing values: {pd.isna(series_to_analyze).sum()}")
+                    st.write(f"Missing values %: {pd.isna(series_to_analyze).sum() / dataframe.shape[0] * 100:.2f}")
+                    st.write(f"Memory usage (kB):  {series_to_analyze.memory_usage() / 1024:.2f} kb")
+
+                with col2:
+                    st.subheader("Statistical info")
+                    st.write(f"Mean: {series_to_analyze.mean():.2f}")
+                    st.write(f"Median: {series_to_analyze.median()}")
+                    st.write(f"Standard deviation: {series_to_analyze.std():.2f}")
+                    st.write(f"Max: {series_to_analyze.max()}")
+                    st.write(f"Min: {series_to_analyze.min()}")
+
+            with histogram_tab:
+
+                fig, ax = plt.subplots()
+                ax.hist(series_to_analyze, bins = 20)
+                ax.set_title(str(selected_variable))
+                st.pyplot(fig)
 
     st.divider()
 
