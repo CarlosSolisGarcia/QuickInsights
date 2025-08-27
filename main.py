@@ -26,37 +26,29 @@ if uploaded_file is not None:
     dataframe_percentage_duplicates = dataframe_num_duplicates / dataframe_num_rows * 100
 
     st.subheader("📊 Exploratory Data Analysis")
-    st.markdown(
-        f"""
-            #### Dataset shape:
-            - **Number of observations (rows)**: {dataframe_num_rows}
-            - **Number of variables (columns)**: {dataframe_num_cols}            
-            #### Missing values:
-            - Number of missing values: {dataframe_num_missing_values}
-            - % of missing values: {dataframe_percentage_missing_values:.2f} %
-            #### Duplicates:
-            - Number of duplicates: {dataframe_num_duplicates}
-            - % of duplicate rows: {dataframe_percentage_duplicates:.2f} % 
-        """
-                )
+    col1, col2, col3 = st.columns(3)
+    col1.metric("Rows", f"{dataframe_num_rows:,}")
+    col2.metric("Columns", f"{dataframe_num_cols:,}")
+    col3.metric("Duplicate rows", f"{dataframe_num_duplicates:,}")
 
-    ### Vamos a analizar, columna por columna, el tipo de variable y su info básica
-    ### Esta info va a ser:
-    # Tipo: numérica, categoríca, texto
-    # Número de filas vacías y % sobre total
-    # Estadísticas básicas: media, mediana, min, max, std, etc.
-    # Distribución de la variable (Testear para tipos: Binomial, Poison, Xi-squared, etc.)
+    col4, col5, col6 = st.columns(3)
+    col4.metric("Total missing values", f"{dataframe_num_missing_values:,}")
+    col5.metric("Missing values %", f"{dataframe_percentage_missing_values:.2f}%")
+    col6.metric("Duplicate rows %", f"{dataframe_percentage_duplicates:.2f}%")
 
-    # Info global del dataset:
-    # ¿Hay filas duplicadas? (núm y % sobre total) --> Indicar cómo generar las claves para el recuento
+    st.markdown("#### Missing values per column")
+    missing_per_column = dataframe.isna().sum()
+    if missing_per_column.sum() > 0:
+        st.bar_chart(missing_per_column)
+    else:
+        st.write("No missing values found in any column.")
 
     columns = dataframe.columns
     selected_variable = st.segmented_control(label="Select a variable to preview",
                                              options=columns,
                                              key="Variable_previsualization_selector")
 
-    ### Descripción de la variable:
-    # Tipo de dato:
+    ### Var descriptions
     if selected_variable is not None:
 
         series_to_analyze = dataframe[selected_variable]
@@ -74,57 +66,72 @@ if uploaded_file is not None:
             data_info_tab, object_graphs_tab = st.tabs(["Data info", "Graphs"])
 
             with data_info_tab:
-                col1, col2, col3 = st.columns(3)
+                col1, col2 = st.columns(2)
 
-                with col3:
-                    top_n = st.slider(label="Top N", min_value=1, value=5)
-                    rare_freq = st.slider(label="Rare freq", min_value=1, value=10)
-
-
+                ### General info
                 with col1:
                     st.subheader("General info")
                     st.write(f"Data type: {series_to_analyze.dtype}")
                     st.write(f"Number of unique values: {series_to_analyze.nunique(dropna=True)}")
                     st.write(f"Missing values: {pd.isna(series_to_analyze).sum()}")
-                    st.write(f"Missing values %: {pd.isna(series_to_analyze).sum() / dataframe.shape[0] * 100:.2f}")
+                    st.write(
+                        f"Missing values %: {pd.isna(series_to_analyze).sum() / dataframe.shape[0] * 100:.2f}")
                     st.write(f"Memory usage (kB):  {series_to_analyze.memory_usage() / 1024:.2f} kb")
 
+                ### String length stats
                 with col2:
-                    #Precalc_vars:
                     string_lengths = series_to_analyze.dropna().astype(str).str.len()
-                    top_values = series_to_analyze.value_counts(dropna=False).head(top_n)
-                    top_prop = top_values.iloc[0] / len(series_to_analyze)
-                    top_category_name = top_values.index[0]
+                    st.subheader("Text length info")
 
-                    value_counts = series_to_analyze.value_counts()
-                    rare_mask = value_counts < rare_freq
-                    rare_values = rare_mask.sum()
-                    rare_categories = value_counts[rare_mask].index.tolist()
+                    st.write(f"Min length: {string_lengths.min()}")
+                    st.write(f"25th percentile: {string_lengths.quantile(0.25):.0f}")
+                    st.write(f"Median length: {string_lengths.median():.0f}")
+                    st.write(f"75th percentile: {string_lengths.quantile(0.75):.0f}")
+                    st.write(f"Max length: {string_lengths.max()}")
+                    st.write(f"Mean length: {string_lengths.mean():.0f}")
+                    st.write(f"Std deviation: {string_lengths.std():.2f}")
 
-                    ### Display info:
-                    st.subheader("Statistical info")
-                    st.write(f"Min. length: {string_lengths.min()}")
-                    st.write(f"Max. length: {string_lengths.max()}")
-                    st.write(f"Average length: {string_lengths.mean():.2f}")
-                    st.write(f"Top category: {top_category_name}")
-                    st.write(f"Top category occurrences: {top_values.iloc[0]}")
-                    st.write(f"Top category proportion: {top_prop:.2f}")
-                    st.write(f"Rare categories (<{rare_freq} appearances): {rare_categories}")
+                ### Category details
+                st.subheader("Category details")
+
+                top_n = st.slider("Top N categories", min_value=1, max_value=20, value=5)
+                rare_freq = st.slider("Rare category threshold", min_value=1, max_value=50, value=10)
+                value_counts = series_to_analyze.value_counts(dropna=False)
+                top_col, rare_col = st.columns(2)
+                top_values = value_counts.head(top_n)
+                with top_col:
+                    st.markdown("**Top categories**")
+                    st.dataframe(top_values.rename("Count").to_frame())
+
+                rare_values = value_counts[value_counts < rare_freq]
+                with rare_col:
+                    st.markdown(f"**Rare categories (<{rare_freq})**")
+                    if rare_values.empty:
+                        st.write("No rare categories found ✅")
+                    else:
+                        st.dataframe(rare_values.rename("Count").to_frame())
 
             with object_graphs_tab:
-                fig, ax = plt.subplots()
-                sns.barplot(x=top_values.values, y=top_values.index, palette="viridis", ax=ax)
-                ax.set_xlabel("Count")
-                ax.set_ylabel("Category")
-                ax.set_title(f"Top {top_n} categories for '{series_to_analyze.name}'")
-                st.pyplot(fig)
+                st.subheader(f"Top {top_n} categories for '{series_to_analyze.name}'")
+                top_values = series_to_analyze.value_counts().head(top_n)
+                st.bar_chart(top_values, horizontal=True)
+
+                # Rare categories
+                rare_values = series_to_analyze.value_counts()[series_to_analyze.value_counts() < rare_freq]
+                st.subheader(f"Rare categories (<{rare_freq} appearances)")
+
+                if rare_values.empty:
+                    st.write("No rare categories found ✅")
+                else:
+                    st.bar_chart(rare_values, horizontal=True)
+
 
         elif series_to_analyze.dtype == "datetime":
             pass
 
         else:
 
-            data_info_tab, histogram_tab = st.tabs(["Data info", "Histogram"])
+            data_info_tab, graph_tab = st.tabs(["Data info", "Graphs"])
 
             with data_info_tab:
                 col1, col2 = st.columns(2)
@@ -134,17 +141,41 @@ if uploaded_file is not None:
                     st.write(f"Data type: {series_to_analyze.dtype}")
                     st.write(f"Missing values: {pd.isna(series_to_analyze).sum()}")
                     st.write(f"Missing values %: {pd.isna(series_to_analyze).sum() / dataframe.shape[0] * 100:.2f}")
+                    st.write(f"Number of unique values: {series_to_analyze.nunique(dropna=True)}")
                     st.write(f"Memory usage (kB):  {series_to_analyze.memory_usage() / 1024:.2f} kb")
 
                 with col2:
                     st.subheader("Statistical info")
-                    st.write(f"Mean: {series_to_analyze.mean():.2f}")
-                    st.write(f"Median: {series_to_analyze.median()}")
-                    st.write(f"Standard deviation: {series_to_analyze.std():.2f}")
-                    st.write(f"Max: {series_to_analyze.max()}")
-                    st.write(f"Min: {series_to_analyze.min()}")
+                    mean_val = series_to_analyze.mean()
+                    median_val = series_to_analyze.median()
+                    std_val = series_to_analyze.std()
+                    min_val = series_to_analyze.min()
+                    q25 = series_to_analyze.quantile(0.25)
+                    q75 = series_to_analyze.quantile(0.75)
+                    max_val = series_to_analyze.max()
+                    sum_val = series_to_analyze.sum()
+                    skew_val = series_to_analyze.skew()
+                    kurt_val = series_to_analyze.kurt()
 
-            with histogram_tab:
+                    subcol1, subcol2 = st.columns(2)
+
+                    with subcol1:
+                        st.markdown("**Basic stats**")
+                        st.write(f"Mean: {series_to_analyze.mean():.2f}")
+                        st.write(f"Median: {series_to_analyze.median()}")
+                        st.write(f"Standard deviation: {series_to_analyze.std():.2f}")
+                        st.write(f"Min: {series_to_analyze.min()}")
+                        st.write(f"25th percentile: {q25:.2f}")
+                        st.write(f"75th percentile: {q75:.2f}")
+                        st.write(f"Max: {max_val:.2f}")
+
+                    with subcol2:
+                        st.markdown("**Advanced stats**")
+                        st.write(f"Sum: {sum_val:.2f}")
+                        st.write(f"Skewness: {skew_val:.2f}")
+                        st.write(f"Kurtosis: {kurt_val:.2f}")
+
+            with graph_tab:
 
                 fig, ax = plt.subplots()
                 ax.hist(series_to_analyze, bins = 20)
