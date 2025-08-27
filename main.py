@@ -4,8 +4,8 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 
 # Step 1: Loading the dataset
-st.title("Data analyzer demo")
-st.write("Welcome to the data analyzer demo, with this app you'll be able to get a quick view of your data")
+st.title("QuickInsights")
+st.write("Welcome to the QuickInsights demo, with this app you'll be able to get a quick view of your data")
 st.write("Stay tuned for more updates!")
 
 uploaded_file = st.file_uploader(label="Upload the dataset you'd like to preview. Please use a Pandas friendly input file:",
