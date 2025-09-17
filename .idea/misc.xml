@@ -3,4 +3,5 @@
   <component name="Black">
     <option name="sdkName" value="Torch310_Lightning_Gradio_Wandb" />
   </component>
+  <component name="ProjectRootManager" version="2" project-jdk-name="Torch310_Lightning_Gradio_Wandb" project-jdk-type="Python SDK" />
 </project>
