@@ -14,17 +14,13 @@ def parse_uploaded_file(file):
     filename = file.name
     extension = os.path.splitext(filename)[1].lower()
 
-    separators = [',', ';', '\t', '|',]
-
     try:
          if extension == ".csv":
-             for sep in separators:
-                 try:
-                     df = pd.read_csv(file, sep=sep)
-                     return df, None
-                 except Exception:
-                     continue
-             return None, f"Couldn't match the separator in the supported separators {separators}"
+             try:
+                 df = pd.read_csv(file, sep=None, engine="python")
+                 return df, None
+             except Exception:
+                 return None, f"Couldn't match the separator automatically"
 
          elif extension in [".xls", ".xlsx"]:
                 df = pd.read_excel(file)
